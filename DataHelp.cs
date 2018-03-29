@@ -336,7 +336,7 @@ namespace Com.Ddlev.Data
         /// <param name="sql">Sql语句，可包含@参数</param>
         /// <param name="list">对应@参数和值的集合</param>
         /// <returns></returns>
-        public T GetInfo<T>(string sql, List<DataItemType> list) where T : new()
+        public T GetInfo<T>(string sql, List<DataItemType> list=null) where T : new()
         {
             var t = new T();
             using (IData data = DataConnect.get(key, Config))
@@ -356,7 +356,7 @@ namespace Com.Ddlev.Data
         /// 返回一组记录的对象
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="sql">Sql语句，可包含@参数</param>
+        /// <param name="sql">Sql语句 或者表名字，sql可包含@参数</param>
         /// <param name="list">对应@参数和值的集合</param>
         /// <returns></returns>
         public List<T> GetList<T>(string sql, List<DataItemType> list=null) where T : new()
@@ -365,7 +365,7 @@ namespace Com.Ddlev.Data
             List<T> listT = new List<T>();
             using (IData data = DataConnect.get(key, Config))
             {
-                IDataReader dr = data.ExecuteIReader( sql, CommandType.Text, list);
+                IDataReader dr = data.ExecuteIReader(sql, CommandType.Text, list);
                 listT = (List<T>)ReaderToObject<T>(dr);
                 dr.Close();
                 dr.Dispose();
@@ -376,7 +376,7 @@ namespace Com.Ddlev.Data
         public List<T> GetList<T>(string sql, Dictionary<string,string> dic) where T : new()
         {
             List<DataItemType> list = new List<DataItemType>();
-            if (dic != null && dic.Count > 0)
+            if (dic.Count > 0)
             {
                 foreach (KeyValuePair<string, string> k in dic)
                 {
@@ -387,18 +387,6 @@ namespace Com.Ddlev.Data
             return GetList<T>(sql,list);
 
         }
-
-        /// <summary>
-        /// 获取相关的信息集合
-        /// </summary>
-        /// <typeparam name="T">类名</typeparam>
-        /// <param name="Table">组合的(sql)语句或者表名 :括号sql语句括号</param>
-        /// <returns></returns>
-        public List<T> GetList<T>(string Table) where T : new()
-        {
-            string sql = "select * from " + Table + " as T_ ";
-            return GetList<T>(sql, new List<DataItemType>());
-        }
         /// <summary>
         /// 获取相关的信息集合
         /// </summary>
@@ -407,10 +395,10 @@ namespace Com.Ddlev.Data
         /// <param name="where">条件(有where)</param>
         /// <param name="orderby">排序(有order by)</param>
         /// <returns></returns>
-        public  List<T> GetList<T>(string Table,string where,string orderby) where T : new()
+        public  List<T> GetList<T>(string Table,string where,string orderby, List<DataItemType> lists = null) where T : new()
         {
             List<T> list = new List<T>();
-            string sql = "select * from " + Table + " as T_ ";
+            string sql = "select * from " + Table + " ";
             if (!string.IsNullOrEmpty(where) && where!="")
             {
                 sql += where;
@@ -419,7 +407,7 @@ namespace Com.Ddlev.Data
             {
                 sql +=" "+ orderby;
             }
-            return GetList<T>(sql, new List<DataItemType>());
+            return GetList<T>(sql, lists);
         }
 
         /// <summary>
