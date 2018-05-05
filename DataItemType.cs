@@ -54,7 +54,7 @@ namespace Com.Ddlev.Data
         /// </summary>
         /// <param name="DataItemName_">对应存贮过程的变量(如"@ID")</param>
         /// <param name="DataValue_">变量对应的值</param>
-        public DataItemType(string DataItemName_, object DataItemValue_)
+        public DataItemType(string DataItemName_, dynamic DataItemValue_)
         {
             this.DataItemName = DataItemName_;
             this.DataItemValue = DataItemValue_;

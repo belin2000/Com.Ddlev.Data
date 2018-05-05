@@ -177,7 +177,8 @@ namespace Com.Ddlev.Data
                 {
                     continue;
                 }
-                list.Add(new DataItemType("@" + pi.Name, pi.GetValue(t, null)));
+                var v = pi.GetValue(t, null);
+                list.Add(new DataItemType("@" + pi.Name, v));
                 coms += "["+pi.Name + "],";
                 values += "@" + pi.Name + ",";
             }
@@ -218,7 +219,8 @@ namespace Com.Ddlev.Data
                 }
                 else
                 {
-                    list.Add(new DataItemType("@" + pi.Name, pi.GetValue(t, null)));
+                    var v = pi.GetValue(t, null);
+                    list.Add(new DataItemType("@" + pi.Name, v));
                     coms += "["+pi.Name + "],";
                     values += "@" + pi.Name + ",";
                 }
@@ -352,6 +354,54 @@ namespace Com.Ddlev.Data
 
             return t;
         }
+
+        /// <summary>
+        /// 返回DataTalbe对象
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="sql">Sql语句 或者表名字，sql可包含@参数</param>
+        /// <param name="list">对应@参数和值的集合</param>
+        /// <returns></returns>
+        public DataTable GetList(string sql, List<DataItemType> list = null)
+        {
+
+            var dt = new DataTable();
+            using (IData data = DataConnect.get(key, Config))
+            {
+                dt = data.ExecQuery(sql, CommandType.Text, list);
+            }
+            return dt;
+
+        }
+        public DataTable GetList(string sql, Dictionary<string, string> dic)
+        {
+            List<DataItemType> list = new List<DataItemType>();
+            if (dic.Count > 0)
+            {
+                foreach (KeyValuePair<string, string> k in dic)
+                {
+                    list.Add(new DataItemType("@" + k.Key, k.Value));
+                }
+            }
+
+            return GetList(sql, list);
+
+        }
+        /// <summary>
+        /// 分页
+        /// </summary>
+        /// <param name="Table">表名或者用（sql）组成的表</param>
+        /// <param name="PageSize">每页的条数</param>
+        /// <param name="PageNum">单前页,必须大于0</param>
+        /// <param name="com">用于排序的列</param>
+        /// <param name="desc">desc/asc(倒序或者顺序)</param>
+        /// <returns></returns>
+        public DataTable GetList(string Table, int PageSize, int PageNum, string OrderBy, List<DataItemType> list = null)
+        {
+            string sql = "select top " + PageSize + " * from (select  ROW_NUMBER() OVER(ORDER BY  " + OrderBy + ") AS R_row_num ,* from " + Table + " as t_able) as a_able where R_row_num>" + ((PageNum - 1) * PageSize).ToString();
+            return GetList(sql, list);
+        }
+
         /// <summary>
         /// 返回一组记录的对象
         /// </summary>
@@ -600,30 +650,62 @@ namespace Com.Ddlev.Data
             }
             return ts;
         }
-
-        public CurPage GetCurPage<T>(string q, int page, int rows, string tablename, string orderby,List<DataItemType> lists=null) where T : new()
+        public CurPage GetCurPage(string q, int page, int rows, string tablename, string orderby, List<DataItemType> lists = null)
         {
             CurPage cp = new CurPage();
-            List<T> list = new List<T>();
             string sql = "select * from " + tablename + "";
             if (!string.IsNullOrEmpty(q) && q != "")
             {
                 sql += " where " + q;
             }
-            list = GetList<T>("(" + sql + ")", rows, page, orderby, lists);
-            cp.rows = list;
-            cp.total = Count("(" + sql + ")", lists);
+            cp.rows = GetList("(" + sql + ")", rows, page, orderby, lists); 
+            cp.total = Count("select COUNT(*) from (" + sql + ") as _c_t", lists);
             return cp;
         }
 
+        public CurPage GetCurPage<T>(string q, int page, int rows, string tablename, string orderby,List<DataItemType> lists=null) where T : new()
+        {
+            CurPage cp = new CurPage();
+            string sql = "select * from " + tablename + "";
+            if (!string.IsNullOrEmpty(q) && q != "")
+            {
+                sql += " where " + q;
+            }
+            List<T> list = new List<T>();
+            list = GetList<T>("(" + sql + ")", rows, page, orderby, lists);
+            cp.rows = list;
+            cp.total = Count("select COUNT(*) from (" + sql + ") as _c_t", lists);
+            return cp;
+        }
+        /// <summary>
+        /// 分页
+        /// </summary>
+        /// <typeparam name="T">返回的类型</typeparam>
+        /// <param name="Table">表或者带()的sql语句</param>
+        /// <param name="PageSize">每页数</param>
+        /// <param name="PageNum">当前页</param>
+        /// <param name="orderby">排序（不用order by字符）</param>
+        /// <param name="lists">条件参数值</param>
+        /// <returns></returns>
         public CurPage GetCurPage<T>(string Table, int PageSize, int PageNum, string orderby, List<DataItemType> lists = null) where T : new()
         {
             CurPage cp = new CurPage();
-            DataTable dt = new DataTable();
+            //DataTable dt = new DataTable();
             string sql = "select top " + PageSize + " * from (select  ROW_NUMBER() OVER(ORDER BY  "+ orderby + ") AS R_row_num ,* from " + Table + " as t_able) as a_able where R_row_num>" + ((PageNum - 1) * PageSize).ToString();
-            var list = GetList<T>("(" + sql + ")", PageSize, PageNum, orderby,lists);
+            var list = GetList<T>(sql, lists);
             cp.rows = list;
-            cp.total = Count("(" + sql + ")", lists);
+            cp.total = Count("select COUNT(*) from (" + Table + ") as _c_t", lists);
+            return cp;
+
+        }
+        public CurPage GetCurPage(string Table, int PageSize, int PageNum, string orderby, List<DataItemType> lists = null)
+        {
+            CurPage cp = new CurPage();
+            DataTable dt = new DataTable();
+            string sql = "select top " + PageSize + " * from (select  ROW_NUMBER() OVER(ORDER BY  " + orderby + ") AS R_row_num ,* from " + Table + " as t_able) as a_able where R_row_num>" + ((PageNum - 1) * PageSize).ToString();
+            var list = GetList(sql,lists);
+            cp.rows = list;
+            cp.total = Count("select COUNT(*) from (" + Table + ") as _c_t", lists);
             return cp;
 
         }
