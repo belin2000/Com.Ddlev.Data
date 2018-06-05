@@ -226,7 +226,7 @@ namespace Com.Ddlev.Data
                         val = cmd.ExecuteNonQuery();
                         tran.Commit();
                     }
-                    catch 
+                    catch
                     {
                         tran.Rollback();
                         val = 0;

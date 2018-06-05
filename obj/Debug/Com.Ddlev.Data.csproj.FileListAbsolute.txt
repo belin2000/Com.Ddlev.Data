@@ -1,5 +1,0 @@
-H:\svn项目\comdll\Com.Ddlev.Data\bin\Debug\Com.Ddlev.Data.dll
-H:\svn项目\comdll\Com.Ddlev.Data\bin\Debug\Com.Ddlev.Data.pdb
-H:\svn项目\comdll\Com.Ddlev.Data\obj\Debug\Com.Ddlev.Data.dll
-H:\svn项目\comdll\Com.Ddlev.Data\obj\Debug\Com.Ddlev.Data.pdb
-H:\svn项目\comdll\Com.Ddlev.Data\obj\Debug\Com.Ddlev.Data.csprojResolveAssemblyReference.cache
