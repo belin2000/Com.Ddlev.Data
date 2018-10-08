@@ -31,9 +31,17 @@ namespace Com.Ddlev.Data
             }
             else
             {
-                var dhelp = new DataHelp(key, config);
-                AddNew(key, dhelp);
-                return dhelp;
+                lock (DataHelpType)
+                {
+                    if (DataHelpDic.ContainsKey(key))
+                    {
+                        var d = DataHelpDic[key];
+                        return d;
+                    }
+                    var dhelp = new DataHelp(key, config);
+                    AddNew(key, dhelp);
+                    return dhelp;
+                }
             }
         }
         /// <summary>
@@ -47,23 +55,21 @@ namespace Com.Ddlev.Data
             var isok = false;
             try
             {
-                lock (DataHelpType)
+                while (isready)
                 {
-                    while (isready)
+                    isready = false;
+                    if (DataHelpDic.ContainsKey(key))
                     {
-                        isready = false;
-                        if (DataHelpDic.ContainsKey(key))
-                        {
-                            var d1 = DataHelpDic[key];
-                            DataHelpDic.Remove(key);
-                            IData data = DataConnect.get(d.key, d.Config);
-                            data.Dispose();
-                        }
-                        DataHelpDic.Add(key, d);
-                        isready = true;
-                        break;
+                        var d1 = DataHelpDic[key];
+                        DataHelpDic.Remove(key);
+                        IData data = DataConnect.get(d.key, d.Config);
+                        data.Dispose();
                     }
+                    DataHelpDic.Add(key, d);
+                    isready = true;
+                    break;
                 }
+                
                 isok = true;
             }
             finally
@@ -83,23 +89,22 @@ namespace Com.Ddlev.Data
             var isok = false;
             try
             {
-                lock (DataHelpType)
+                
+                while (isready)
                 {
-                    while (isready)
+                    isready = false;
+                    if (DataHelpDic.ContainsKey(key))
                     {
-                        isready = false;
-                        if (DataHelpDic.ContainsKey(key))
-                        {
-                            var d = DataHelpDic[key];
-                            DataHelpDic.Remove(key);
-                            IData data = DataConnect.get(d.key, d.Config);
-                            data.Dispose();
-                        }
-                        isready = true;
-                        break;
+                        var d = DataHelpDic[key];
+                        DataHelpDic.Remove(key);
+                        IData data = DataConnect.get(d.key, d.Config);
+                        data.Dispose();
                     }
-                    isok = true;
+                    isready = true;
+                    break;
                 }
+                isok = true;
+                
             }
             finally
             {
