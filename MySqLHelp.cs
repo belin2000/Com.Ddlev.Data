@@ -4,25 +4,24 @@ using System.Text;
 using System.Configuration;
 using System.Data;
 using System.Data.Common;
-using System.Data.OleDb;
 using System.IO;
 using System.Web;
 using System.Threading.Tasks;
+using MySql.Data.MySqlClient;
 
 namespace Com.Ddlev.Data
 {
     /// <summary>
-    /// 非sql的数据库操作;
+    /// MySql的数据库操作;
     /// </summary>
-    public sealed class OledbHelp:IData
+    public sealed class MySQLHelp:IData
     {
         string connectionstring = null;
         bool isdispose = false;
-        private OleDbConnection _conn;
-
+        private MySqlConnection _conn;
         static readonly object padlock = new object();
 
-        public OledbHelp(string _connectionstring)
+        public MySQLHelp(string _connectionstring)
         {
             connectionstring = _connectionstring;
         }
@@ -42,7 +41,7 @@ namespace Com.Ddlev.Data
         /// <param name="cmdType"></param>
         /// <param name="cmdText"></param>
         /// <param name="cmdParms"></param>
-        private void PrepareCommand(OleDbCommand cmd, OleDbConnection conn, OleDbTransaction trans, CommandType cmdType, string cmdText, OleDbParameter[] cmdParms=null)
+        private void PrepareCommand(MySqlCommand cmd, MySqlConnection conn, MySqlTransaction trans, CommandType cmdType, string cmdText, MySqlParameter[] cmdParms=null)
         {
 
             if (conn.State != ConnectionState.Open)
@@ -57,7 +56,7 @@ namespace Com.Ddlev.Data
 
             if (cmdParms != null)
             {
-                foreach (OleDbParameter parm in cmdParms)
+                foreach (MySqlParameter parm in cmdParms)
                     cmd.Parameters.Add(parm);
             }
         }
@@ -68,7 +67,7 @@ namespace Com.Ddlev.Data
         public DbConnection Conn
         {
             get { if (_conn==null)
-                _conn = new OleDbConnection(connectionstring);
+                _conn = new MySqlConnection(connectionstring);
             return (DbConnection)(_conn);
         }
         }
@@ -164,7 +163,7 @@ namespace Com.Ddlev.Data
         /// <summary>
         /// 析构函数
         /// </summary>
-        ~OledbHelp()
+        ~MySQLHelp()
         {
             Dispose(!isdispose);
         }
@@ -204,15 +203,15 @@ namespace Com.Ddlev.Data
         /// <returns></returns>
         public DbParameter[] SetDbParameter(List<DataItemType> ldt)
         {
-            OleDbParameter[] sp = null;
+            MySqlParameter[] sp = null;
             if (ldt!=null && ldt.Count > 0)
             {
-                sp = new OleDbParameter[ldt.Count];
+                sp = new MySqlParameter[ldt.Count];
                 for (int i = 0; i < ldt.Count; i++)
                 {
                     if (ldt[i].DataItemValue is DBNull || ldt[i].DataItemValue==null)
                     {
-                        sp[i] = new OleDbParameter();//, ldt[i].DbType, 
+                        sp[i] = new MySqlParameter();//, ldt[i].DbType, 
                         sp[i].ParameterName = ldt[i].DataItemName;
                         sp[i].Size = ldt[i].SizeLength;
                         sp[i].DbType = ldt[i].DbType;
@@ -220,7 +219,7 @@ namespace Com.Ddlev.Data
                     }
                     else
                     {
-                        sp[i] = new OleDbParameter(ldt[i].DataItemName, ldt[i].DataItemValue);
+                        sp[i] = new MySqlParameter(ldt[i].DataItemName, ldt[i].DataItemValue);
                     }
                 }
             }
@@ -235,15 +234,15 @@ namespace Com.Ddlev.Data
 
         public IDataParameter[] SetDbParameter(IList<DataItemType> ldt)
         {
-            OleDbParameter[] sp = null;
+            MySqlParameter[] sp = null;
             if (ldt != null && ldt.Count > 0)
             {
-                sp = new OleDbParameter[ldt.Count];
+                sp = new MySqlParameter[ldt.Count];
                 for (int i = 0; i < ldt.Count; i++)
                 {
                     if (ldt[i].DataItemValue is DBNull || ldt[i].DataItemValue == null)
                     {
-                        sp[i] = new OleDbParameter();//, ldt[i].DbType, 
+                        sp[i] = new MySqlParameter();//, ldt[i].DbType, 
                         sp[i].ParameterName = ldt[i].DataItemName;
                         sp[i].Size = ldt[i].SizeLength;
                         sp[i].DbType = ldt[i].DbType;
@@ -251,26 +250,24 @@ namespace Com.Ddlev.Data
                     }
                     else
                     {
-                        sp[i] = new OleDbParameter(ldt[i].DataItemName, ldt[i].DataItemValue);
+                        sp[i] = new MySqlParameter(ldt[i].DataItemName, ldt[i].DataItemValue);
                     }
                 }
             }
             return sp;
         }
-
-
         public int ExecuteNonQuery(string cmdText, List<DataItemType> ldt=null, CommandType cmdType = CommandType.Text)
         {
             int val = 0;
-            using (OleDbConnection conn = new OleDbConnection(connectionstring))
+            using (MySqlConnection conn = new MySqlConnection(connectionstring))
             {
-                OleDbCommand cmd = new OleDbCommand();
+                MySqlCommand cmd = new MySqlCommand();
                 if (conn.State != ConnectionState.Open)
                     conn.Open();
                 if (cmdType == CommandType.Text) //使用sql语句时候，使用事务
                 {
                     var tran = conn.BeginTransaction();
-                    PrepareCommand(cmd, conn, tran, cmdType, cmdText, (OleDbParameter[])SetDbParameter(ldt));
+                    PrepareCommand(cmd, conn, tran, cmdType, cmdText, (MySqlParameter[])SetDbParameter(ldt));
                     try
                     {
                         val = cmd.ExecuteNonQuery();
@@ -288,10 +285,10 @@ namespace Com.Ddlev.Data
                 }
                 else
                 {
-                    PrepareCommand(cmd, conn, null, cmdType, cmdText, (OleDbParameter[])SetDbParameter(ldt));
+                    PrepareCommand(cmd, conn, null, cmdType, cmdText, (MySqlParameter[])SetDbParameter(ldt));
                     val = cmd.ExecuteNonQuery();
                 }
-                if (val > 0 && ldt != null && ldt.Count > 0)
+                if (val > 0 && ldt!=null &&  ldt.Count>0)
                 {
                     for (int i = 0; i < ldt.Count; i++)
                     {
@@ -308,12 +305,12 @@ namespace Com.Ddlev.Data
 
         public IDataReader ExecuteIReader(string cmdText, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
-            OleDbCommand cmd = new OleDbCommand();
-            OleDbConnection conn = new OleDbConnection(connectionstring);
+            MySqlCommand cmd = new MySqlCommand();
+            MySqlConnection conn = new MySqlConnection(connectionstring);
             try
             {
-                PrepareCommand(cmd, conn, null, cmdType, cmdText, (OleDbParameter[])SetDbParameter(ldt));
-                OleDbDataReader rdr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+                PrepareCommand(cmd, conn, null, cmdType, cmdText, (MySqlParameter[])SetDbParameter(ldt));
+                MySqlDataReader rdr = cmd.ExecuteReader(CommandBehavior.CloseConnection);
                 cmd.Parameters.Clear();
                 return rdr;
             }
@@ -326,10 +323,10 @@ namespace Com.Ddlev.Data
 
         public object ExecuteScalar(string cmdText, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
-            using (OleDbConnection connection = new OleDbConnection(connectionstring))
+            using (MySqlConnection connection = new MySqlConnection(connectionstring))
             {
-                OleDbCommand cmd = new OleDbCommand();
-                PrepareCommand(cmd, connection, null, cmdType, cmdText, (OleDbParameter[])SetDbParameter(ldt));
+                MySqlCommand cmd = new MySqlCommand();
+                PrepareCommand(cmd, connection, null, cmdType, cmdText, (MySqlParameter[])SetDbParameter(ldt));
                 object val = cmd.ExecuteScalar();
                 cmd.Parameters.Clear();
                 cmd.Dispose();
@@ -339,11 +336,11 @@ namespace Com.Ddlev.Data
 
         public DataTable ExecQuery(string cmdText, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
-            using (OleDbConnection connection = new OleDbConnection(connectionstring))
+            using (MySqlConnection connection = new MySqlConnection(connectionstring))
             {
-                OleDbCommand cmd = new OleDbCommand();
-                PrepareCommand(cmd, connection, null, cmdType, cmdText, (OleDbParameter[])SetDbParameter(ldt));
-                OleDbDataAdapter sda = new OleDbDataAdapter(cmd);
+                MySqlCommand cmd = new MySqlCommand();
+                PrepareCommand(cmd, connection, null, cmdType, cmdText, (MySqlParameter[])SetDbParameter(ldt));
+                MySqlDataAdapter sda = new MySqlDataAdapter(cmd);
                 DataTable dt = new DataTable();
                 sda.Fill(dt);
                 cmd.Parameters.Clear();
@@ -352,13 +349,12 @@ namespace Com.Ddlev.Data
                 return dt;
             }
         }
-
         public int ExecuteNonQuery(string[] cmdTexts, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
             int val = 0;
-            using (OleDbConnection conn = new OleDbConnection(connectionstring))
+            using (MySqlConnection conn = new MySqlConnection(connectionstring))
             {
-                OleDbCommand cmd = new OleDbCommand();
+                MySqlCommand cmd = new MySqlCommand();
                 if (conn.State != ConnectionState.Open)
                     conn.Open();
                 var tran = conn.BeginTransaction();
@@ -366,7 +362,7 @@ namespace Com.Ddlev.Data
                 {
                     foreach (var cmdText in cmdTexts)
                     {
-                        PrepareCommand(cmd, conn, tran, cmdType, cmdText, (OleDbParameter[])SetDbParameter(ldt));
+                        PrepareCommand(cmd, conn, tran, cmdType, cmdText, (MySqlParameter[])SetDbParameter(ldt));
                         cmd.ExecuteNonQuery();
                     }
                 

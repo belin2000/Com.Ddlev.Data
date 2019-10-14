@@ -20,7 +20,7 @@ namespace Com.Ddlev.Data
         /// 
         /// </summary>
         /// <param name="_ConnectStr">连接字符串</param>
-        /// <param name="_Datatype">类型(SQL/Access)</param>
+        /// <param name="_Datatype">类型(SQL/Access/MySql)</param>
         public Config(string _ConnectStr=null, string _Datatype=null)
         {
             this.ConnectStr = _ConnectStr;

@@ -10,7 +10,7 @@ namespace Com.Ddlev.Data
     /// <summary>
     /// 对应存贮过程的数据类型
     /// </summary>
-    public class DataItemType
+    public class DataItemType:IDataPara
     {
         public string DataItemName
         {

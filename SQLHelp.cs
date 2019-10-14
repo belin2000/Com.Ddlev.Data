@@ -10,31 +10,16 @@ using System.Threading.Tasks;
 namespace Com.Ddlev.Data
 {
     /// <summary>
-    /// sql数据库操作(不允许继承和初始化)，使用SQLHelp.IHelp()来初始化;
+    /// sql数据库操作;
     /// </summary>
     public sealed class SQLHelp:IData
     {
-
-        static string connectionstring = null;
+        string connectionstring = null;
         bool isdispose = false;
         private SqlConnection _conn;
 
-        private static SQLHelp shelp = null;
         static readonly object padlock = new object();
 
-
-        public static SQLHelp IHelp(string _connectionstring)
-        {
-
-            lock (padlock)
-            {
-                if (shelp == null)
-                {
-                    shelp = new SQLHelp(_connectionstring);
-                }
-                return shelp;
-            }
-        }
         public SQLHelp(string _connectionstring)
         {
             connectionstring = _connectionstring;
@@ -56,7 +41,7 @@ namespace Com.Ddlev.Data
         /// <param name="cmdType"></param>
         /// <param name="cmdText"></param>
         /// <param name="cmdParms"></param>
-        private void PrepareCommand(SqlCommand cmd, SqlConnection conn, SqlTransaction trans, CommandType cmdType, string cmdText, SqlParameter[] cmdParms)
+        private void PrepareCommand(SqlCommand cmd, SqlConnection conn, SqlTransaction trans, CommandType cmdType, string cmdText, SqlParameter[] cmdParms=null)
         {
 
             if (conn.State != ConnectionState.Open)
@@ -105,7 +90,7 @@ namespace Com.Ddlev.Data
             sp[1].Value = filename;
             try
             {
-                ExecuteNonQuery(sql, CommandType.Text, sp);
+                ExecuteNonQuery(sql,sp, CommandType.Text);
                 return true;
             }
             catch
@@ -130,7 +115,7 @@ namespace Com.Ddlev.Data
             sp[1].Value = filename;
             try
             {
-                ExecuteNonQuery( sql, CommandType.Text, sp);
+                ExecuteNonQuery( sql,sp, CommandType.Text);
                 return true;
             }
             catch
@@ -208,32 +193,43 @@ namespace Com.Ddlev.Data
             }
             isdispose = true;
         }
-
-        int ExecuteNonQuery(string cmdText, CommandType cmdType= CommandType.Text, SqlParameter[] commandParameters=null)
+        /// <summary>
+        /// 单条sql语句执行（如果是语句，则使用sql版的存储过程执行）
+        /// </summary>
+        /// <param name="cmdText">单条sql或者多条SQl在一起</param>
+        /// <param name="cmdType"></param>
+        /// <param name="commandParameters"></param>
+        /// <returns></returns>
+        private int ExecuteNonQuery(string cmdText,  SqlParameter[] commandParameters=null, CommandType cmdType = CommandType.Text)
         {
             int val = 0;
             using (SqlConnection conn = new SqlConnection(connectionstring))
             {
                 SqlCommand cmd = new SqlCommand();
+                if (conn.State != ConnectionState.Open)
+                    conn.Open();
                 if (cmdType == CommandType.Text) //使用sql语句时候，使用事务
                 {
-                    if (conn.State != ConnectionState.Open)
-                        conn.Open();
-                    var tran = conn.BeginTransaction();
-                    PrepareCommand(cmd, conn, tran, cmdType, cmdText, commandParameters);
+                    cmdText = @"SET XACT_ABORT OFF
+                    BEGIN TRY
+                    BEGIN TRAN  
+                    "+cmdText+ @"
+                    COMMIT TRAN
+                    END TRY  
+                    BEGIN CATCH  
+                    THROW
+                    ROLLBACK  TRAN 
+                    END CATCH  
+                    ";
+                    PrepareCommand(cmd, conn, null, cmdType, cmdText, commandParameters);
                     try
                     {
                         val = cmd.ExecuteNonQuery();
-                        tran.Commit();
+                        val = 1;
                     }
-                    catch
+                    catch(SqlException er)
                     {
-                        tran.Rollback();
                         val = 0;
-                    }
-                    finally
-                    {
-                        tran.Dispose();
                     }
                 }
                 else
@@ -272,7 +268,16 @@ namespace Com.Ddlev.Data
                     }
                     else
                     {
-                        sp[i] = new SqlParameter(ldt[i].DataItemName, ldt[i].DataItemValue);
+                        var pik=new object() ;
+                        if (ldt[i].DataItemValue.GetType().IsEnum)
+                        {
+                            pik = (int)ldt[i].DataItemValue;
+                        }
+                        else
+                        {
+                            pik = ldt[i].DataItemValue;
+                        }
+                        sp[i] = new SqlParameter(ldt[i].DataItemName, pik);
                     }
                 }
             }
@@ -306,45 +311,53 @@ namespace Com.Ddlev.Data
             return sp;
         }
 
-        public int ExecuteNonQuery(string cmdText, CommandType cmdType = CommandType.Text, List<DataItemType> ldt = null)
-        {
-            return ExecuteNonQuery(cmdText, cmdType, (SqlParameter[])SetDbParameter(ldt));
-            
-        }
-
-        public List<DataItemType> ExecuteNonQuery(string cmdText, List<DataItemType> ldt, CommandType cmdType = CommandType.Text)
+        /// <summary>
+        /// 执行sql（用事务的方式）
+        /// </summary>
+        /// <param name="cmdText"></param>
+        /// <param name="ldt"></param>
+        /// <param name="cmdType"></param>
+        /// <returns></returns>
+        public int ExecuteNonQuery(string cmdText, List<DataItemType> ldt, CommandType cmdType = CommandType.Text)
         {
             int val = 0;
             using (SqlConnection conn = new SqlConnection(connectionstring))
             {
                 SqlCommand cmd = new SqlCommand();
+                if (conn.State != ConnectionState.Open)
+                    conn.Open();
                 if (cmdType == CommandType.Text) //使用sql语句时候，使用事务
                 {
-                    if (conn.State != ConnectionState.Open)
-                        conn.Open();
-                    var tran = conn.BeginTransaction();
-                    PrepareCommand(cmd, conn, tran, cmdType, cmdText, (SqlParameter[])SetDbParameter(ldt));
+                    cmdText = @"SET XACT_ABORT OFF
+                    BEGIN TRY
+                    BEGIN TRAN  
+                    " + cmdText + @"
+                    COMMIT TRAN
+                    END TRY  
+                    BEGIN CATCH 
+                    THROW 
+                    ROLLBACK TRAN
+                    END CATCH  
+                    ";
+
+                    PrepareCommand(cmd, conn, null, cmdType, cmdText, (SqlParameter[])SetDbParameter(ldt));
                     try
                     {
                         val = cmd.ExecuteNonQuery();
-                        tran.Commit();
+                        val = 1;
                     }
-                    catch
+                    catch (SqlException ex)
                     {
-                        tran.Rollback();
                         val = 0;
                     }
-                    finally
-                    {
-                        tran.Dispose();
-                    }
+
                 }
                 else
                 {
                     PrepareCommand(cmd, conn, null, cmdType, cmdText, (SqlParameter[])SetDbParameter(ldt));
                     val = cmd.ExecuteNonQuery();
                 }
-                if (val > 0)
+                if (val > 0 && ldt!=null && ldt.Count>0)
                 {
                     for (int i = 0; i < ldt.Count; i++)
                     {
@@ -355,11 +368,11 @@ namespace Com.Ddlev.Data
                     }
                 }
                 cmd.Parameters.Clear();
-                return ldt;
+                return val;
             }
         }
 
-        public IDataReader ExecuteIReader(string cmdText, CommandType cmdType = CommandType.Text, List<DataItemType> ldt = null)
+        public IDataReader ExecuteIReader(string cmdText, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
             SqlCommand cmd = new SqlCommand();
             SqlConnection conn = new SqlConnection(connectionstring);
@@ -377,7 +390,7 @@ namespace Com.Ddlev.Data
             }
         }
 
-        public object ExecuteScalar(string cmdText, CommandType cmdType = CommandType.Text, List<DataItemType> ldt = null)
+        public object ExecuteScalar(string cmdText, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
             using (SqlConnection connection = new SqlConnection(connectionstring))
             {
@@ -390,7 +403,7 @@ namespace Com.Ddlev.Data
             }
         }
 
-        public DataTable ExecQuery(string cmdText, CommandType cmdType = CommandType.Text, List<DataItemType> ldt = null)
+        public DataTable ExecQuery(string cmdText, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
         {
             using (SqlConnection connection = new SqlConnection(connectionstring))
             {
@@ -403,6 +416,61 @@ namespace Com.Ddlev.Data
                 sda.Dispose();
                 cmd.Dispose();
                 return dt;
+            }
+        }
+        /// <summary>
+        /// 分开执行多条sql,如果有一条错误，全部回滚，如果是存储过程，则存储过程里面不能含有事务
+        /// </summary>
+        /// <param name="cmdTexts"></param>
+        /// <param name="ldt"></param>
+        /// <param name="cmdType"></param>
+        /// <returns></returns>
+        public int ExecuteNonQuery(string[] cmdTexts, List<DataItemType> ldt = null, CommandType cmdType = CommandType.Text)
+        {
+            int val = 0;
+            List<int> lit = new List<int>();
+            using (SqlConnection conn = new SqlConnection(connectionstring))
+            {
+                SqlCommand cmd = new SqlCommand();
+                if (conn.State != ConnectionState.Open)
+                    conn.Open();
+                var tran= conn.BeginTransaction();
+                try {
+                    foreach (var cmdText in cmdTexts)
+                    {
+                        PrepareCommand(cmd, conn, tran, cmdType, cmdText);
+                        lit.Add(cmd.ExecuteNonQuery());
+                    }
+                    if (lit.Exists(m => m == 0))
+                    {
+                        tran.Rollback();
+                        val = 0;
+                    }
+                    else
+                    {
+                        tran.Commit();
+                        val = 1;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    tran.Rollback();
+                    val = 0;
+                }
+
+
+                if (val > 0 && ldt != null && ldt.Count > 0)
+                {
+                    for (int i = 0; i < ldt.Count; i++)
+                    {
+                        if (ldt[i].DBParameterDirection != ParameterDirection.Input)
+                        {
+                            ldt[i].DataItemValue = cmd.Parameters[ldt[i].DataItemName].Value;
+                        }
+                    }
+                }
+                cmd.Parameters.Clear();
+                return val;
             }
         }
         #endregion

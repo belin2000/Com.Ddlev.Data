@@ -100,7 +100,14 @@ namespace Com.Ddlev.Data
                 if (config == null || config.ConnectStr==null)
                 {
                     string configstr = System.Configuration.ConfigurationManager.ConnectionStrings[key].ConnectionString;
+                    if (string.IsNullOrWhiteSpace(configstr))
+                    {
+                        configstr = System.Configuration.ConfigurationManager.ConnectionStrings["strConn"].ConnectionString; //使用默认的链接
+                        key = "strConn";
+                    }
+
                     string Datatype = System.Configuration.ConfigurationManager.AppSettings[key + "_DbType"];
+
                     if (string.IsNullOrWhiteSpace(Datatype))
                     {
                         Datatype = "SQL";
@@ -124,10 +131,13 @@ namespace Com.Ddlev.Data
             switch (DbType)
             {
                 case "SQL":
-                    data = SQLHelp.IHelp(constr);
+                    data = new SQLHelp(constr);
                     break;
                 case "Access":
-                    data = OledbHelp.IHelp(constr);
+                    data = new OledbHelp(constr);
+                    break;
+                case "MySql":
+                    data = new MySQLHelp(constr);
                     break;
                 default:
                     data = null;
